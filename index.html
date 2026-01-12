@@ -121,14 +121,25 @@
 
         // --- Helper Functions ---
 
-        const generateGrid = (targetWord, gridSize = 8) => {
+        const getGridSize = (level) => {
+            switch(level) {
+                case 'easy': return 5;
+                case 'medium': return 6;
+                case 'high': return 8;
+                default: return 6;
+            }
+        };
+
+        const generateGrid = (targetWord, level) => {
+            const gridSize = getGridSize(level);
             const grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(''));
-            const directions = [[0, 1], [1, 0]]; // Horizontal, Vertical only for accessibility
+            const directions = [[0, 1], [1, 0]]; // Horizontal, Vertical only
             const dir = directions[Math.floor(Math.random() * directions.length)];
             
-            // Simple placement logic (can be expanded)
+            // Placement Logic with safety break
             let placed = false;
-            while (!placed) {
+            let attempts = 0;
+            while (!placed && attempts < 100) {
                 const row = Math.floor(Math.random() * gridSize);
                 const col = Math.floor(Math.random() * gridSize);
                 
@@ -142,14 +153,26 @@
                     }
                     placed = true;
                 }
+                attempts++;
             }
 
-            // Fill rest with random chars
-            const chars = "不約而同吞雲吐霧悠悠信用打賭珍藏盡情濃癮抽屜上下左右心情快樂天氣美好";
+            // Fallback if placement failed (rare but safe)
+            if (!placed) {
+                for (let i = 0; i < targetWord.length; i++) {
+                    if (i < gridSize) grid[0][i] = targetWord[i];
+                }
+            }
+
+            // Distractor Logic: Filter out target chars from the random pool
+            const baseChars = "不約而同吞雲吐霧悠悠信用打賭珍藏盡情濃癮抽屜上下左右心情快樂天氣美好光陰似箭日月如梭一心一意五花八門七上八下";
+            // Remove characters present in targetWord to prevent visual confusion
+            const targetSet = new Set(targetWord.split(''));
+            const validChars = baseChars.split('').filter(c => !targetSet.has(c));
+
             for (let r = 0; r < gridSize; r++) {
                 for (let c = 0; c < gridSize; c++) {
                     if (grid[r][c] === '') {
-                        grid[r][c] = chars[Math.floor(Math.random() * chars.length)];
+                        grid[r][c] = validChars[Math.floor(Math.random() * validChars.length)];
                     }
                 }
             }
@@ -166,7 +189,6 @@
         };
 
         const playSound = (type) => {
-            // Simple oscillator beeps for feedback (Browser compatible)
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (!AudioContext) return;
             const ctx = new AudioContext();
@@ -204,7 +226,6 @@
         // --- Components ---
 
         const Icon = ({ name, size = 24, className }) => {
-            // Lucide icons rendered dynamically
             React.useEffect(() => {
                 lucide.createIcons();
             }, [name]);
@@ -235,67 +256,69 @@
                                     </button>
                                 </div>
 
-                                {/* Font Size Control */}
-                                <div className="mb-8">
-                                    <h3 className="text-lg font-bold text-detective-700 mb-4 flex items-center gap-2">
-                                        <Icon name="type" /> 字體大小
-                                    </h3>
-                                    <div className="space-y-3">
-                                        {[14, 16, 18, 22, 26, 32].map(size => (
-                                            <button
-                                                key={size}
-                                                onClick={() => setSettings(s => ({...s, fontSize: size}))}
-                                                className={`w-full p-3 rounded-lg flex items-center justify-between transition-colors ${
-                                                    settings.fontSize === size 
-                                                        ? 'bg-indigo-600 text-white shadow-lg' 
-                                                        : 'bg-white border border-detective-200 text-detective-600'
-                                                }`}
-                                            >
-                                                <span style={{ fontSize: `${size}px` }}>
-                                                    {size === 14 ? "小小的" : 
-                                                     size === 16 ? "小一點" :
-                                                     size === 18 ? "剛剛好" :
-                                                     size === 22 ? "大一點" :
-                                                     size === 26 ? "大大的" : "超～大"}
-                                                </span>
-                                                {settings.fontSize === size && <Icon name="check" size={16} />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Speech Rate Control */}
-                                <div className="mb-8">
-                                    <h3 className="text-lg font-bold text-detective-700 mb-4 flex items-center gap-2">
-                                        <Icon name="mic" /> 說話速度
-                                    </h3>
-                                    <div className="bg-white p-4 rounded-xl border border-detective-200">
-                                        <div className="flex justify-between text-2xl mb-2">
-                                            <span>🐢</span>
-                                            <span>🐇</span>
-                                        </div>
-                                        <input 
-                                            type="range" 
-                                            min="0.5" max="1.0" step="0.1"
-                                            value={settings.speechRate}
-                                            onChange={(e) => setSettings(s => ({...s, speechRate: parseFloat(e.target.value)}))}
-                                            className="w-full h-2 bg-detective-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                                        />
-                                        <div className="text-center mt-2 font-mono text-detective-500">
-                                            {settings.speechRate}x
+                                <div className="mb-8 overflow-y-auto max-h-[60vh] settings-scroll pr-2">
+                                    {/* Font Size Control */}
+                                    <div className="mb-8">
+                                        <h3 className="text-lg font-bold text-detective-700 mb-4 flex items-center gap-2">
+                                            <Icon name="type" /> 字體大小
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {[14, 16, 18, 22, 26, 32].map(size => (
+                                                <button
+                                                    key={size}
+                                                    onClick={() => setSettings(s => ({...s, fontSize: size}))}
+                                                    className={`w-full p-3 rounded-lg flex items-center justify-between transition-colors ${
+                                                        settings.fontSize === size 
+                                                            ? 'bg-indigo-600 text-white shadow-lg' 
+                                                            : 'bg-white border border-detective-200 text-detective-600'
+                                                    }`}
+                                                >
+                                                    <span style={{ fontSize: `${size}px` }}>
+                                                        {size === 14 ? "小小的" : 
+                                                         size === 16 ? "小一點" :
+                                                         size === 18 ? "剛剛好" :
+                                                         size === 22 ? "大一點" :
+                                                         size === 26 ? "大大的" : "超～大"}
+                                                    </span>
+                                                    {settings.fontSize === size && <Icon name="check" size={16} />}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Audio Toggle */}
-                                <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-detective-200">
-                                    <span className="font-bold text-detective-700">語音開關</span>
-                                    <button 
-                                        onClick={() => setSettings(s => ({...s, soundEnabled: !s.soundEnabled}))}
-                                        className={`w-14 h-8 rounded-full p-1 transition-colors ${settings.soundEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
-                                    >
-                                        <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${settings.soundEnabled ? 'translate-x-6' : ''}`} />
-                                    </button>
+                                    {/* Speech Rate Control */}
+                                    <div className="mb-8">
+                                        <h3 className="text-lg font-bold text-detective-700 mb-4 flex items-center gap-2">
+                                            <Icon name="mic" /> 說話速度
+                                        </h3>
+                                        <div className="bg-white p-4 rounded-xl border border-detective-200">
+                                            <div className="flex justify-between text-2xl mb-2">
+                                                <span>🐢</span>
+                                                <span>🐇</span>
+                                            </div>
+                                            <input 
+                                                type="range" 
+                                                min="0.5" max="1.0" step="0.1"
+                                                value={settings.speechRate}
+                                                onChange={(e) => setSettings(s => ({...s, speechRate: parseFloat(e.target.value)}))}
+                                                className="w-full h-2 bg-detective-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                            />
+                                            <div className="text-center mt-2 font-mono text-detective-500">
+                                                {settings.speechRate}x
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Audio Toggle */}
+                                    <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-detective-200">
+                                        <span className="font-bold text-detective-700">語音開關</span>
+                                        <button 
+                                            onClick={() => setSettings(s => ({...s, soundEnabled: !s.soundEnabled}))}
+                                            className={`w-14 h-8 rounded-full p-1 transition-colors ${settings.soundEnabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                                        >
+                                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform ${settings.soundEnabled ? 'translate-x-6' : ''}`} />
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
                         </>
@@ -304,10 +327,16 @@
             );
         };
 
-        const Grid = ({ letters, targetWord, onFound, settings }) => {
+        const Grid = ({ letters, targetWord, onFound, settings, level }) => {
             const [selected, setSelected] = useState([]);
             const [isSelecting, setIsSelecting] = useState(false);
             const [foundCells, setFoundCells] = useState([]);
+            
+            // Determine grid columns style dynamically
+            const gridSize = getGridSize(level);
+            const gridStyle = {
+                gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`
+            };
 
             const handleStart = (r, c) => {
                 setIsSelecting(true);
@@ -317,17 +346,36 @@
 
             const handleMove = (r, c) => {
                 if (!isSelecting) return;
-                // Simple logic: allow adding neighbors
                 const last = selected[selected.length - 1];
                 if (last.r === r && last.c === c) return;
                 
                 // Check if neighbor
                 if (Math.abs(last.r - r) <= 1 && Math.abs(last.c - c) <= 1) {
-                     // Check if not already in selection to prevent loops
-                     if (!selected.some(cell => cell.r === r && cell.c === c)) {
-                         setSelected([...selected, {r, c}]);
-                         playSound('tap');
-                     }
+                    
+                    // Prevent backtracking/looping
+                    if (selected.some(cell => cell.r === r && cell.c === c)) return;
+
+                    // STRICT LINEAR LOGIC (Vector Locking)
+                    if (selected.length >= 1) {
+                        // If we already have 2+ points, enforce the existing direction
+                        if (selected.length >= 2) {
+                            const dRow = selected[1].r - selected[0].r;
+                            const dCol = selected[1].c - selected[0].c;
+                            
+                            // Check if the new move follows the same vector
+                            if ((r - last.r) === dRow && (c - last.c) === dCol) {
+                                setSelected([...selected, {r, c}]);
+                                playSound('tap');
+                            }
+                        } else {
+                            // If we only have 1 point, the second point defines the direction (must be horizontal or vertical for this game)
+                            // Enforce Horizontal or Vertical only (No diagonal for simplicity unless requested, keeping strict to crossword style)
+                            if (r === last.r || c === last.c) {
+                                setSelected([...selected, {r, c}]);
+                                playSound('tap');
+                            }
+                        }
+                    }
                 }
             };
 
@@ -337,18 +385,18 @@
                 
                 if (word === targetWord) {
                     playSound('success');
-                    setFoundCells(selected); // Keep highlighted green
+                    setFoundCells(selected);
                     onFound();
                 } else {
                     playSound('error');
-                    // Shake animation logic could go here
                 }
                 setSelected([]);
             };
 
             return (
                 <div 
-                    className="grid grid-cols-8 gap-1 p-2 bg-white rounded-xl border-2 border-detective-300 shadow-inner select-none touch-none"
+                    className="grid gap-1 p-2 bg-white rounded-xl border-2 border-detective-300 shadow-inner select-none touch-none w-full max-w-[500px] mx-auto"
+                    style={gridStyle}
                     onPointerLeave={handleEnd}
                     onPointerUp={handleEnd}
                 >
@@ -364,9 +412,9 @@
                                         aspect-square flex items-center justify-center font-bold rounded-lg cursor-pointer
                                         ${isSelected ? 'grid-cell-selected' : isFound ? 'grid-cell-found' : 'bg-detective-50 text-detective-600 hover:bg-detective-100'}
                                     `}
-                                    style={{ fontSize: `${settings.fontSize + 4}px` }}
+                                    style={{ fontSize: `${settings.fontSize + (level === 'easy' ? 4 : 2)}px` }}
                                     onPointerDown={(e) => {
-                                        e.target.releasePointerCapture(e.pointerId); // Essential for touch drag across divs
+                                        e.target.releasePointerCapture(e.pointerId);
                                         handleStart(r, c);
                                     }}
                                     onPointerEnter={() => handleMove(r, c)}
@@ -383,9 +431,8 @@
         const GameScreen = ({ level, onBack, onComplete, settings }) => {
             const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
             const [gridLetters, setGridLetters] = useState([]);
-            const [showHint, setShowHint] = useState(0); // 0: None, 1: Highlight first char, 2: Show answer
+            const [showHint, setShowHint] = useState(0); 
             
-            // Filter questions based on level
             const questions = useMemo(() => {
                 let types = [];
                 if (level === 'easy') types = ['visual'];
@@ -398,11 +445,12 @@
 
             useEffect(() => {
                 if (currentQ) {
-                    setGridLetters(generateGrid(currentQ.word));
+                    // Regenerate grid with Level-based logic
+                    setGridLetters(generateGrid(currentQ.word, level));
                     setShowHint(0);
                     speak(`請找出：${currentQ.word}`, settings.speechRate, settings.soundEnabled);
                 }
-            }, [currentQuestionIdx, currentQ, settings]);
+            }, [currentQuestionIdx, currentQ, settings, level]);
 
             const handleFound = () => {
                 speak("太棒了！找到了！", settings.speechRate, settings.soundEnabled);
@@ -410,7 +458,7 @@
                     if (currentQuestionIdx < questions.length - 1) {
                         setCurrentQuestionIdx(prev => prev + 1);
                     } else {
-                        onComplete(questions.length); // Pass score
+                        onComplete(questions.length); 
                     }
                 }, 1500);
             };
@@ -423,9 +471,9 @@
             if (!currentQ) return <div>Loading...</div>;
 
             return (
-                <div className="flex flex-col h-full relative">
+                <div className="flex flex-col h-full relative overflow-hidden">
                     {/* Top Bar */}
-                    <div className="flex justify-between items-center p-4 bg-white border-b border-detective-200 shadow-sm z-20">
+                    <div className="flex justify-between items-center p-4 bg-white border-b border-detective-200 shadow-sm z-20 shrink-0">
                         <button onClick={onBack} className="flex items-center gap-2 text-detective-600 font-bold hover:bg-detective-100 px-3 py-1 rounded-lg">
                             <Icon name="arrow-left" /> 返回
                         </button>
@@ -437,64 +485,65 @@
                         </button>
                     </div>
 
-                    {/* Scene / Clue Area */}
-                    <div className="flex-1 bg-detective-100 p-4 flex flex-col items-center justify-center relative overflow-hidden">
-                        {/* Background Decor */}
-                        <div className="absolute top-10 left-10 opacity-10"><Icon name="file-search" size={100} /></div>
+                    {/* Main Content: Split View for Desktop, Column for Mobile */}
+                    <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                         
-                        <motion.div 
-                            key={currentQ.word}
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="bg-white p-6 rounded-2xl shadow-xl max-w-md w-full text-center border-t-4 border-indigo-500 relative z-10"
-                        >
-                            <div className="text-6xl mb-4">{currentQ.icon}</div>
+                        {/* Left/Top: Scene & Question */}
+                        <div className="flex-1 bg-detective-100 relative flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto">
+                             <div className="absolute top-10 left-10 opacity-10 pointer-events-none"><Icon name="file-search" size={100} /></div>
                             
-                            {/* Level 1: Visual - Show Word Big */}
-                            {level === 'easy' && (
-                                <h2 className="font-black text-indigo-600 mb-2" style={{ fontSize: `${settings.fontSize + 10}px` }}>
-                                    {currentQ.word}
-                                </h2>
-                            )}
+                            <motion.div 
+                                key={currentQ.word}
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-2xl text-center border-t-4 border-indigo-500 relative z-10 my-auto"
+                            >
+                                <div className="text-6xl mb-4">{currentQ.icon}</div>
+                                
+                                {level === 'easy' && (
+                                    <h2 className="font-black text-indigo-600 mb-2 leading-tight" style={{ fontSize: `${settings.fontSize + 10}px` }}>
+                                        {currentQ.word}
+                                    </h2>
+                                )}
 
-                            {/* Level 2 & 3: Clue based */}
-                            {(level === 'medium' || level === 'high') && (
-                                <h2 className="font-bold text-detective-800 mb-2" style={{ fontSize: `${settings.fontSize + 4}px` }}>
-                                    {level === 'medium' ? "這是什麼成語？" : "填填看："}
-                                </h2>
-                            )}
+                                {(level === 'medium' || level === 'high') && (
+                                    <h2 className="font-bold text-detective-800 mb-2 leading-tight" style={{ fontSize: `${settings.fontSize + 4}px` }}>
+                                        {level === 'medium' ? "這是什麼成語？" : "填填看："}
+                                    </h2>
+                                )}
 
-                            <p className="text-detective-600 mt-2" style={{ fontSize: `${settings.fontSize}px` }}>
-                                {currentQ.hint}
-                            </p>
+                                <p className="text-detective-600 mt-2 leading-relaxed" style={{ fontSize: `${settings.fontSize}px` }}>
+                                    {currentQ.hint}
+                                </p>
 
-                            {/* Hint scaffolding */}
-                            {showHint >= 2 && (
-                                <motion.div initial={{opacity:0}} animate={{opacity:1}} className="mt-4 p-2 bg-green-100 text-green-700 rounded-lg">
-                                    答案是：{currentQ.word}
-                                </motion.div>
-                            )}
-                        </motion.div>
-                    </div>
+                                {showHint >= 2 && (
+                                    <motion.div initial={{opacity:0}} animate={{opacity:1}} className="mt-4 p-2 bg-green-100 text-green-700 rounded-lg">
+                                        答案是：{currentQ.word}
+                                    </motion.div>
+                                )}
+                            </motion.div>
+                        </div>
 
-                    {/* Grid Area */}
-                    <div className="bg-detective-50 p-4 pb-24 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] rounded-t-3xl z-10">
-                         <div className="max-w-md mx-auto">
-                            <div className="flex justify-between mb-2">
-                                <span className="text-sm text-detective-400 font-bold uppercase tracking-widest">
-                                    CIPHER TEXT
-                                </span>
-                                <button onClick={() => speak(currentQ.word, 0.7, settings.soundEnabled)} className="text-indigo-500">
-                                    <Icon name="volume-2" />
-                                </button>
-                            </div>
-                            <Grid 
-                                letters={gridLetters} 
-                                targetWord={currentQ.word} 
-                                onFound={handleFound}
-                                settings={settings}
-                            />
-                         </div>
+                        {/* Right/Bottom: Grid */}
+                        <div className="bg-detective-50 p-4 md:p-8 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-[-4px_0_20px_rgba(0,0,0,0.05)] rounded-t-3xl md:rounded-t-none md:rounded-l-3xl z-10 shrink-0 md:w-[50%] lg:w-[45%] flex flex-col justify-center relative overflow-y-auto">
+                             <div className="w-full max-w-lg mx-auto">
+                                <div className="flex justify-between mb-4 px-2">
+                                    <span className="text-sm text-detective-400 font-bold uppercase tracking-widest">
+                                        CIPHER TEXT - LEVEL: {level.toUpperCase()}
+                                    </span>
+                                    <button onClick={() => speak(currentQ.word, 0.7, settings.soundEnabled)} className="text-indigo-500 hover:bg-indigo-50 p-1 rounded">
+                                        <Icon name="volume-2" />
+                                    </button>
+                                </div>
+                                <Grid 
+                                    letters={gridLetters} 
+                                    targetWord={currentQ.word} 
+                                    onFound={handleFound}
+                                    settings={settings}
+                                    level={level}
+                                />
+                             </div>
+                        </div>
                     </div>
                 </div>
             );
@@ -502,10 +551,10 @@
 
         const ReportScreen = ({ score, onRestart, onHome, settings }) => {
             return (
-                <div className="h-full flex flex-col items-center justify-center bg-paper p-6 text-center">
+                <div className="h-full flex flex-col items-center justify-center bg-paper p-6 text-center overflow-y-auto">
                     <motion.div 
                         initial={{ scale: 0 }} animate={{ scale: 1 }}
-                        className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full border-4 border-detective-800"
+                        className="bg-white p-8 rounded-3xl shadow-2xl max-w-2xl w-full border-4 border-detective-800 my-auto"
                     >
                         <div className="text-6xl mb-4">🎉</div>
                         <h1 className="text-3xl font-black text-detective-900 mb-4">案件調查報告</h1>
@@ -532,7 +581,7 @@
                             </div>
                         </div>
 
-                        <div className="flex gap-4">
+                        <div className="flex gap-4 flex-col sm:flex-row">
                             <button onClick={onHome} className="flex-1 py-3 bg-detective-200 text-detective-700 font-bold rounded-xl hover:bg-detective-300 transition">
                                 回首頁
                             </button>
@@ -570,7 +619,7 @@
             };
 
             return (
-                <div className="h-screen w-full overflow-hidden flex flex-col relative" style={{ fontSize: `${settings.fontSize}px` }}>
+                <div className="h-screen w-full overflow-hidden flex flex-col relative bg-detective-50" style={{ fontSize: `${settings.fontSize}px` }}>
                     
                     {/* Settings Button (Global) */}
                     <button 
@@ -593,9 +642,9 @@
                             <motion.div 
                                 key="home"
                                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -100 }}
-                                className="flex-1 flex flex-col items-center justify-center p-6 bg-detective-50 relative"
+                                className="flex-1 flex flex-col items-center justify-center p-6 bg-detective-50 relative overflow-y-auto"
                             >
-                                <div className="text-center max-w-2xl w-full">
+                                <div className="text-center max-w-3xl w-full my-auto">
                                     <div className="mb-6 inline-block p-4 bg-white rounded-full shadow-xl">
                                         <Icon name="search" size={64} className="text-indigo-600" />
                                     </div>
@@ -608,44 +657,44 @@
 
                                     {/* Name Input Mockup */}
                                     <div className="bg-white p-2 rounded-2xl shadow-sm border border-detective-200 max-w-md mx-auto mb-8 flex">
-                                        <div className="bg-detective-100 px-4 py-2 rounded-xl flex items-center justify-center font-bold text-detective-500">
+                                        <div className="bg-detective-100 px-4 py-2 rounded-xl flex items-center justify-center font-bold text-detective-500 whitespace-nowrap">
                                             偵探代號
                                         </div>
-                                        <input type="text" placeholder="輸入名字..." className="flex-1 px-4 outline-none bg-transparent" />
+                                        <input type="text" placeholder="輸入名字..." className="flex-1 px-4 outline-none bg-transparent min-w-0" />
                                     </div>
 
                                     {/* Level Selection */}
-                                    <div className="grid gap-4 max-w-md mx-auto">
-                                        <button onClick={() => { setLevel('easy'); setScreen('game'); }} className="group relative overflow-hidden bg-white p-4 rounded-2xl border-2 border-green-200 hover:border-green-500 transition-all text-left shadow-sm hover:shadow-md">
-                                            <div className="flex items-center gap-4">
-                                                <div className="bg-green-100 p-3 rounded-xl text-green-600 font-bold text-xl">🟢</div>
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-detective-800">初級案件：眼力大考驗</h3>
-                                                    <p className="text-sm text-detective-500">直接找出看到的詞彙</p>
-                                                </div>
-                                                <Icon name="chevron-right" className="ml-auto text-detective-300 group-hover:text-green-500" />
+                                    <div className="grid gap-4 max-w-4xl mx-auto md:grid-cols-3">
+                                        <button onClick={() => { setLevel('easy'); setScreen('game'); }} className="group relative overflow-hidden bg-white p-6 rounded-2xl border-2 border-green-200 hover:border-green-500 transition-all text-left shadow-sm hover:shadow-md flex flex-col justify-between h-full">
+                                            <div className="bg-green-100 p-3 rounded-xl text-green-600 font-bold text-xl w-fit mb-4">🟢</div>
+                                            <div>
+                                                <h3 className="font-bold text-lg text-detective-800 mb-2">初級案件：<br/>眼力大考驗</h3>
+                                                <p className="text-sm text-detective-500">5x5 字盤<br/>直接找出看到的詞彙</p>
+                                            </div>
+                                            <div className="mt-4 flex justify-end">
+                                                <Icon name="chevron-right" className="text-detective-300 group-hover:text-green-500" />
                                             </div>
                                         </button>
 
-                                        <button onClick={() => { setLevel('medium'); setScreen('game'); }} className="group relative overflow-hidden bg-white p-4 rounded-2xl border-2 border-yellow-200 hover:border-yellow-500 transition-all text-left shadow-sm hover:shadow-md">
-                                            <div className="flex items-center gap-4">
-                                                <div className="bg-yellow-100 p-3 rounded-xl text-yellow-600 font-bold text-xl">🟡</div>
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-detective-800">中級案件：線索聯想</h3>
-                                                    <p className="text-sm text-detective-500">看圖片猜猜看</p>
-                                                </div>
-                                                <Icon name="chevron-right" className="ml-auto text-detective-300 group-hover:text-yellow-500" />
+                                        <button onClick={() => { setLevel('medium'); setScreen('game'); }} className="group relative overflow-hidden bg-white p-6 rounded-2xl border-2 border-yellow-200 hover:border-yellow-500 transition-all text-left shadow-sm hover:shadow-md flex flex-col justify-between h-full">
+                                            <div className="bg-yellow-100 p-3 rounded-xl text-yellow-600 font-bold text-xl w-fit mb-4">🟡</div>
+                                            <div>
+                                                <h3 className="font-bold text-lg text-detective-800 mb-2">中級案件：<br/>線索聯想</h3>
+                                                <p className="text-sm text-detective-500">6x6 字盤<br/>看圖片猜猜看</p>
+                                            </div>
+                                            <div className="mt-4 flex justify-end">
+                                                 <Icon name="chevron-right" className="text-detective-300 group-hover:text-yellow-500" />
                                             </div>
                                         </button>
 
-                                        <button onClick={() => { setLevel('high'); setScreen('game'); }} className="group relative overflow-hidden bg-white p-4 rounded-2xl border-2 border-red-200 hover:border-red-500 transition-all text-left shadow-sm hover:shadow-md">
-                                            <div className="flex items-center gap-4">
-                                                <div className="bg-red-100 p-3 rounded-xl text-red-600 font-bold text-xl">🔴</div>
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-detective-800">高級案件：密碼解讀</h3>
-                                                    <p className="text-sm text-detective-500">讀句子填空</p>
-                                                </div>
-                                                <Icon name="chevron-right" className="ml-auto text-detective-300 group-hover:text-red-500" />
+                                        <button onClick={() => { setLevel('high'); setScreen('game'); }} className="group relative overflow-hidden bg-white p-6 rounded-2xl border-2 border-red-200 hover:border-red-500 transition-all text-left shadow-sm hover:shadow-md flex flex-col justify-between h-full">
+                                            <div className="bg-red-100 p-3 rounded-xl text-red-600 font-bold text-xl w-fit mb-4">🔴</div>
+                                            <div>
+                                                <h3 className="font-bold text-lg text-detective-800 mb-2">高級案件：<br/>密碼解讀</h3>
+                                                <p className="text-sm text-detective-500">8x8 字盤<br/>讀句子填空</p>
+                                            </div>
+                                            <div className="mt-4 flex justify-end">
+                                                 <Icon name="chevron-right" className="text-detective-300 group-hover:text-red-500" />
                                             </div>
                                         </button>
                                     </div>
